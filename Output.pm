@@ -4,7 +4,7 @@ use strict;
 use Carp;
 use warnings;
 
-our $VERSION = 1.03;
+our $VERSION = 1.04;
 
 BEGIN {
   use Exporter   ();
@@ -66,7 +66,7 @@ sub Init_ANSI {
 
   *cprint = sub {
     my ($String);
-    if ($#_ >= 0) { $String = shift; }
+    if ($#_ >= 0) { $String = join ("", @_);; }
     else { $String = $_; }
 
     $String =~ s/$_Symbol(\s|\D|$)/${_Symbol}0$1/g;
@@ -109,7 +109,7 @@ sub Init_Console {
 
   *cprint = sub {
     my ($String);
-    if ($#_ >= 0) { $String = shift; }
+    if ($#_ >= 0) { $String = join ("", @_); }
     else { $String = $_; }
 
     ccprint($String, 1);
@@ -144,14 +144,6 @@ sub Init_Console {
 
 
 1;
-
-
-
-
-
-
-
-1;
 __END__
 
 =head1 NAME
@@ -182,7 +174,7 @@ Clearing the screen
 
 =over
 
-=item init
+=item Init
 
 Initialise this module, this should be done before doing anything else with this module.
 
@@ -192,13 +184,15 @@ However, you can change this behaviour by changing the value of several variable
 
 =item cprint [Text]
 
-Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3)
+Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3) (by default)
+
+All params are joined into 1 string.
 
 Examples:
 
    cprint ("\x033Blue text\x030\n");
    cprint ("\0035Red text\n");
-   cprint ("The text is still red, ". chr(3) ."7and now it is green.\x030\n");
+   cprint ("The text is still red, ", chr(3) ,"7and now it is green.\x030\n");
 
 Note:
 
@@ -206,7 +200,7 @@ Note:
 
 =item cprintf [Text]
 
-Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3)
+Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3) (by default)
 
 Examples:
 
@@ -222,13 +216,13 @@ Note1:
    However, I'm not sure wheter or not this is very safe.. so you might want to pay attention when you use it.
 
 
-=item Clear
+=item clear
 
 Clears the screen.
 
 Example:
 
-   Clear
+   clear();
 
 =back
 

@@ -1,5 +1,10 @@
 Revision history for Perl extension Color::Output.
 
+1.04  Thu Oct  9 13:15:00 2003
+	- Mistakes in pod changed.
+
+	- cprint now joins all params into one string and prints that string
+
 1.03  Sun Oct  5 17:40:00 2003
         - Names changed:
 		- DoPrint is changed into cprint (Color print)
@@ -24,6 +29,7 @@ Revision history for Perl extension Color::Output.
         - Small bug fix for the Win32::Console-part, text was not shown when it did not had the color-symbol in it.
 
         - DoPrintf added 
+
 
 0.01  Sun Sep  7 21:16:12 2003
 	- original version; created by h2xs 1.21 with options
