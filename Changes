@@ -1,5 +1,10 @@
 Revision history for Perl extension Color::Output.
 
+1.05  Wed Sep  8 20:00:00 2004
+	- Bug-fix: warning if $\ was not defined.
+
+	- cprint ignores the first param if it's an object 
+
 1.04  Thu Oct  9 13:15:00 2003
 	- Mistakes in pod changed.
 

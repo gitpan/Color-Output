@@ -4,7 +4,7 @@ use strict;
 use Carp;
 use warnings;
 
-our $VERSION = 1.04;
+our $VERSION = 1.05;
 
 BEGIN {
   use Exporter   ();
@@ -66,7 +66,12 @@ sub Init_ANSI {
 
   *cprint = sub {
     my ($String);
-    if ($#_ >= 0) { $String = join ("", @_);; }
+
+    if (defined $_[0] and ref $_[0]) {
+      shift, unless (ref $_[0] eq 'ARRAY' || ref $_[0] eq 'HASH' || ref $_[0] eq 'SCALAR' || ref $_[0] eq 'CODE' || ref $_[0] eq 'GLOB');
+    }
+
+    if ($#_ >= 0) { $String = join ("", @_); }
     else { $String = $_; }
 
     $String =~ s/$_Symbol(\s|\D|$)/${_Symbol}0$1/g;
@@ -109,6 +114,11 @@ sub Init_Console {
 
   *cprint = sub {
     my ($String);
+
+    if (defined $_[0] and ref $_[0]) {
+      shift, unless (ref $_[0] eq 'ARRAY' || ref $_[0] eq 'HASH' || ref $_[0] eq 'SCALAR' || ref $_[0] eq 'CODE' || ref $_[0] eq 'GLOB');
+    }
+
     if ($#_ >= 0) { $String = join ("", @_); }
     else { $String = $_; }
 
@@ -136,7 +146,7 @@ sub Init_Console {
       $_Console->Write($2);
     }
 
-    if ($Option) { $_Console->Write($\ . ""); }
+    if ($Option && defined $\) { $_Console->Write($\ . ""); }
     $_Console->Display();
   };
 }
@@ -197,6 +207,8 @@ Examples:
 Note:
 
    The text-color is set to the default one when the program ends.
+
+   If the first param is an objet then this param is ignored (not being outputed).
 
 =item cprintf [Text]
 
