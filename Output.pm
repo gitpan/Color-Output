@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use Carp;
 
-our $VERSION = 1.01;
+our $VERSION = 1.02;
 
 
 BEGIN {
@@ -12,7 +12,7 @@ BEGIN {
   our (@ISA, @EXPORT);
 
   @ISA = qw(Exporter);
-  @EXPORT = qw(&DoPrint &Clear);
+  @EXPORT = qw(&DoPrint &DoPrintf &Clear);
 }
 
 my ($Clear, $Mode, $Method, $Console, @List);
@@ -71,6 +71,7 @@ sub Clear {
 
 sub DoPrint {
   croak "You did not initialised this module with the new-method!", unless (defined $Method);
+
   &$Method(@_);
 }
 
@@ -79,13 +80,14 @@ sub Print_Console {
   return, unless (defined $String);
 
   $String =~ s/\x03([\s\D])/\x030$1/g;
-  my ($First) = $String =~ /^(.*?)\x03/s;
+  my ($First, $Last) = $String =~ /^(.*?)(?:\x03|$)/s;
   $Console->Write($First), if (defined $First);
 
   while ($String =~ /\x03(\d\d?)([^\x03]*)/g) {
     $Console->Attr($List[$1]);
     $Console->Write($2);
   }
+  $Console->Write($\);
   $Console->Display;
 }
 
@@ -99,6 +101,19 @@ sub Print_ANSI {
 
   print $String;
 }
+
+
+sub DoPrintf {
+  my ($String) = shift;
+
+  croak "You did not initialised this module with the new-method!", unless (defined $Method);
+  return, unless (defined $String);
+
+  &$Method(sprintf $String, @_);
+}
+
+
+
 
 END {
   if (defined $Mode) {
@@ -133,26 +148,19 @@ Clearing the screen
 
 =back
 
-=head2 Methods
+=head1 Methods
 
 =over
 
 =item new [Mode]
 
-Initialise this module.
-The mode can be (this mode applies to all systems):
+Initialise this module, this should be done before doing anything else with this module.
 
-=over
+If you use mode B<1> then this module will use B<ANSI-Colors>.
 
-=item 1:
+If mode B<2> is used then B<Win32::Console> will be used.
 
-Use ANSI-colors
-
-=item 2:
-
-Use Win32::Console
-
-=back
+No mode (or another one) means the default mode, which is Win32::Console on Win32 and ANSI on any other OS.
 
 Examples:
 
@@ -174,6 +182,32 @@ Note:
 
    The text-color is set to the default one when the program ends.
 
+=item DoPrintf [Text]
+
+Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3)
+
+Examples:
+
+   DoPrintf ("\x033This is a %s string\x030\n", "blue");
+   DoPrintf ("\0035%s text\n", "red");
+   DoPrintf ("The text is still %s, ". chr(3) ."7and now it is %s.\x030\n", "red", "green");
+
+
+Note1:
+
+   When you use -l (as an option to the perl interprter (read perldoc perlrun)) then there is one difference with
+
+   a 'normal' printf, it will add the output record seperater (mostly \n).
+
+
+Note2:
+
+   If you call DoPrintf, then it runs sprintf and that result is printed with DoPrint.
+
+   However, I'm not sure wheter or not this is very safe.. so you might want to pay attention when you use it.
+
+
+
 =item Clear
 
 Clears the screen.
@@ -181,6 +215,8 @@ Clears the screen.
 Example:
 
    Clear
+
+=back
 
 =head1 Demo
 
@@ -213,21 +249,7 @@ When Win32::Console is used then a normal print/printf won't be visibile.
 
 =head1 SEE ALSO
 
-=over
-
-=item *
-
-  Term::ANSIColor
-
-=item *
-
-  Win32::Console
-
-=item *
-
-  Win32::Console::ANSI
-
-=back
+L<Term::ANSIColor>, L<Win32::Console>, L<Win32::Console::ANSI>
 
 =head1 BUGS
 

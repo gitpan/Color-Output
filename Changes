@@ -4,3 +4,7 @@ Revision history for Perl extension Color::Output.
 	- original version; created by h2xs 1.21 with options
 		-AX -n Color::Output
 
+1.02  Thu Sep 19 18:27:32 2003
+        - Small bug fix for the Win32::Console-part, text was not shown when it did not had the color-symbol in it.
+
+        - DoPrintf added 
