@@ -1,125 +1,155 @@
 package Color::Output;
 
-use warnings;
 use strict;
 use Carp;
+use warnings;
 
-our $VERSION = 1.02;
-
+our $VERSION = 1.03;
 
 BEGIN {
   use Exporter   ();
   our (@ISA, @EXPORT);
 
   @ISA = qw(Exporter);
-  @EXPORT = qw(&DoPrint &DoPrintf &Clear);
+  @EXPORT = qw(&cprint &cprintf &clear);
 }
 
-my ($Clear, $Mode, $Method, $Console, @List);
+
+my ($_Mode, $_Console);
+my ($_Symbol) = "\x03";
+
+our ($Mode, $Symbol);
 
 
-sub new  {
-  my $self  = { } ;
-  bless ($self);
-
-  if (defined $_[1] and $_[1] =~ /^\d+$/) {
-    if ($_[1] == 1) { $self->Init_ANSI; }
-    elsif ($_[1] == 2) { $self->Init_W32Console; }
+sub Init {
+  if (defined $_Mode) {
+    carp "You already ran Init!";
+    return;
   }
-  unless (defined $Method) {
-    if ($^O =~ /Win32/) { 
-      $self->Init_W32Console;
-      $Clear = 'cls';
+  $_Symbol = $Symbol, if (defined $Symbol);
+  $_Mode = 0;
+
+  if (defined $Mode && $Mode =~ /^\d+$/) {
+    if ($Mode == 1 || $Mode == 2) { $_Mode = $Mode; }
+  }
+
+  if ($^O =~ /Win32/) {
+    $_Mode = 2, unless (defined $_Mode and $_Mode == 1);
+    if ($_Mode == 1) {
+      *clear = sub { system("cls"); };
     }
-    else { 
-      $self->Init_ANSI;
-      $Clear = 'clear';
+    elsif ($_Mode == 2) {
+      *clear = sub {
+        $_Console->Cls();
+        $_Console->Display();
+      };
     }
   }
-  return $self;
-}
-
-
-sub Init_W32Console {
-  $Method = \&Print_Console;
-  $Mode = 2;
-
-  require Win32::Console;
-  $Console = new Win32::Console;
-
-  @List = qw(7 0 1 9 4 12 2 10 5 13 3 11 6 14 7 15);
-}
-
-sub Init_ANSI {
-  $Method = \&Print_ANSI;
-  $Mode = 1;
-
-  @List = qw(0m 30m 34m 34;1m 31m 31;1m 32m 32;1m 35m 35;1m 36m 36;1m 33m 33;1m 37m 37;1m);
-}
-
-
-sub Clear {
-  croak "You did not initialised this module with the new-method!", unless (defined $Clear and defined $Mode);
-
-  if ($Mode == 1) { system($Clear); }
   else {
-    $Console->Cls;
-    $Console->Display;
+    $_Mode = 1, unless (defined $_Mode and $_Mode == 2);
+    *clear = sub {
+       system("clear");
+    };
   }
+
+  if ($_Mode == 1)    { &Init_ANSI();    }
+  elsif ($_Mode == 2) { &Init_Console(); }
+
 }
 
 
-sub DoPrint {
-  croak "You did not initialised this module with the new-method!", unless (defined $Method);
+################################################################################
+# ANSI-PART                                                                    #
+################################################################################
+sub Init_ANSI {
+  my @List = qw(0m 30m 34m 34;1m 31m 31;1m 32m 32;1m 35m 35;1m 36m 36;1m 33m 33;1m 37m 37;1m);
 
-  &$Method(@_);
+  *cprint = sub {
+    my ($String);
+    if ($#_ >= 0) { $String = shift; }
+    else { $String = $_; }
+
+    $String =~ s/$_Symbol(\s|\D|$)/${_Symbol}0$1/g;
+    $String =~ s/$_Symbol(\d\d?)/\033[$List[$1]/g;
+    print $String;
+  };
+
+  *cprintf = sub {
+    my ($String);
+    if ($#_ >= 0) { $String = shift; $String = sprintf ($String, @_); }
+    else { $String = $_; }
+
+    $String =~ s/$_Symbol(\s|\D|$)/${_Symbol}0$1/g;
+    $String =~ s/$_Symbol(\d\d?)/\033[$List[$1]/g;
+    printf $String;
+  };
 }
-
-sub Print_Console {
-  my ($String) = shift;
-  return, unless (defined $String);
-
-  $String =~ s/\x03([\s\D])/\x030$1/g;
-  my ($First, $Last) = $String =~ /^(.*?)(?:\x03|$)/s;
-  $Console->Write($First), if (defined $First);
-
-  while ($String =~ /\x03(\d\d?)([^\x03]*)/g) {
-    $Console->Attr($List[$1]);
-    $Console->Write($2);
-  }
-  $Console->Write($\);
-  $Console->Display;
-}
-
-
-sub Print_ANSI {
-  my ($String) = shift;
-  return, unless (defined $String);
-
-  $String =~ s/\x03([\s\D])/\x030$1/g;
-  $String =~ s/\x03(\d\d?)/\033[$List[$1]/g;
-
-  print $String;
-}
-
-
-sub DoPrintf {
-  my ($String) = shift;
-
-  croak "You did not initialised this module with the new-method!", unless (defined $Method);
-  return, unless (defined $String);
-
-  &$Method(sprintf $String, @_);
-}
-
-
 
 
 END {
-  if (defined $Mode) {
-    if ($Mode == 1) { printf "\033[" . $List[0]; }
+  # Reset text-color.
+
+  if (defined $_Mode && $_Mode == 1) {
+    printf "\033[0m";
   }
 }
+
+################################################################################
+# W32::Console-PART                                                            #
+################################################################################
+sub Init_Console {
+  eval {
+    require Win32::Console;
+  } or croak $@;
+
+  import Win32::Console qw(STD_OUTPUT_HANDLE);
+  $_Console = new Win32::Console(&STD_OUTPUT_HANDLE());
+#  $_Console = new Win32::Console();
+  my @List = qw(7 0 1 9 4 12 2 10 5 13 3 11 6 14 7 15);
+
+  *cprint = sub {
+    my ($String);
+    if ($#_ >= 0) { $String = shift; }
+    else { $String = $_; }
+
+    ccprint($String, 1);
+  };
+
+  *cprintf = sub {
+    my ($String);
+    if ($#_ >= 0) { $String = shift; $String = sprintf ($String, @_); }
+    else { $String = $_; }
+    ccprint($String, 0);
+  };
+
+  *ccprint = sub {
+    my ($String) = shift;
+    my ($Option) = shift;
+
+    $String =~ s/$_Symbol(\s|\D|$)/${_Symbol}0$1/g;
+    my ($First, $Last) = $String =~ /^(.*?)(?:$_Symbol|$)/s;
+    $_Console->Write($First), if (defined $First);
+    $_Console->Write("\n"), if (defined $First and defined $Last);
+
+    while ($String =~ /$_Symbol(\d\d?)([^$_Symbol]*)/g) {
+      $_Console->Attr($List[$1]);
+      $_Console->Write($2);
+    }
+
+    if ($Option) { $_Console->Write($\ . ""); }
+    $_Console->Display();
+  };
+}
+
+
+
+1;
+
+
+
+
+
+
 
 1;
 __END__
@@ -152,60 +182,44 @@ Clearing the screen
 
 =over
 
-=item new [Mode]
+=item init
 
 Initialise this module, this should be done before doing anything else with this module.
 
-If you use mode B<1> then this module will use B<ANSI-Colors>.
+By default it will use ANSI-Colors on Linux/Unix and Win32::Console on windows.
 
-If mode B<2> is used then B<Win32::Console> will be used.
+However, you can change this behaviour by changing the value of several variables, more about that in the Vars-Section
 
-No mode (or another one) means the default mode, which is Win32::Console on Win32 and ANSI on any other OS.
-
-Examples:
-
-   new Color::Output;      # Default mode, ANSI on Unix/Linux, Win32::Console on Windows
-   new Color::Output (1);  # Use ANSI-colors
-   new Color::Output (2);  # Use Win32::Console
-
-=item DoPrint [Text]
+=item cprint [Text]
 
 Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3)
 
 Examples:
 
-   DoPrint ("\x033Blue text\x030\n");
-   DoPrint ("\0035Red text\n");
-   DoPrint ("The text is still red, ". chr(3) ."7and now it is green.\x030\n");
+   cprint ("\x033Blue text\x030\n");
+   cprint ("\0035Red text\n");
+   cprint ("The text is still red, ". chr(3) ."7and now it is green.\x030\n");
 
 Note:
 
    The text-color is set to the default one when the program ends.
 
-=item DoPrintf [Text]
+=item cprintf [Text]
 
 Display the text on the screen. The char to identify a color is: \x03 or \003 or chr(3)
 
 Examples:
 
-   DoPrintf ("\x033This is a %s string\x030\n", "blue");
-   DoPrintf ("\0035%s text\n", "red");
-   DoPrintf ("The text is still %s, ". chr(3) ."7and now it is %s.\x030\n", "red", "green");
+   cprintf ("\x033This is a %s string\x030\n", "blue");
+   cprintf ("\0035%s text\n", "red");
+   cprintf ("The text is still %s, ". chr(3) ."7and now it is %s.\x030\n", "red", "green");
 
 
 Note1:
 
-   When you use -l (as an option to the perl interprter (read perldoc perlrun)) then there is one difference with
-
-   a 'normal' printf, it will add the output record seperater (mostly \n).
-
-
-Note2:
-
-   If you call DoPrintf, then it runs sprintf and that result is printed with DoPrint.
+   If you call cprintf, then it runs sprintf and that result is printed with cprint.
 
    However, I'm not sure wheter or not this is very safe.. so you might want to pay attention when you use it.
-
 
 
 =item Clear
@@ -218,13 +232,40 @@ Example:
 
 =back
 
+=head1 Variables
+
+=over
+
+=item Mode ($Color::Output::Mode)
+
+With this variable you can change the way this module behaves.
+
+By default ANSI-Colors will be used on Linux/Unix and Win32::Console on Win32.
+
+If you change this var to B<1> then B<ANSI-Colors> will be used,
+
+If you set it to B<2> then B<Win32::Console> will be used.
+
+Examples: examples/ANSI.pl and examples/W32.pl
+
+=item Symbol ($Color::Output::Symbol)
+
+This is the symbol you can use to color your text, by default chr(3) will be used.
+
+Example: examples/symbol.pl
+
+=back
+
+
 =head1 Demo
 
   use Color::Output;
-  new Color::Output;
+  Color::Output::Init;
   for (my($i)=0;$i<16;$i++) {
-    DoPrint("Demo $i: \t\x03$i example\x030\n");
+    cprint("Color=$i". (" " x (15 - length($i))) ."\x03" . $i . "Example $0, color $i\x030\n");
   }
+
+  This code is also added as an example (examples/colors.pl)
 
 
 =head1 NOTES
@@ -233,17 +274,8 @@ Example:
 
 =item *
 
-If you use Win32::Console then the screen will be cleared before the text is displayed.
-There is nothing I/you can do about that..
-
-=item *
-
 There is a module called Win32::Console::ANSI, but when I tested it had some bugs..
 Therefor I decided to rewrite this module and make it public.
-
-=item *
-
-When Win32::Console is used then a normal print/printf won't be visibile.
 
 =back
 
@@ -253,7 +285,14 @@ L<Term::ANSIColor>, L<Win32::Console>, L<Win32::Console::ANSI>
 
 =head1 BUGS
 
-None reported so far
+=over
+
+=item *
+
+While testing Win32::Console i noticed that it sometimes did not display the color or the correct color..
+This is a Win32::Console-issue/bug.
+
+=back
 
 =head1 AUTHOR
 
